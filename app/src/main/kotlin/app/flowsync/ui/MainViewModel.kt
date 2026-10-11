@@ -8,6 +8,7 @@ import app.flowsync.FlowSyncApp
 import app.flowsync.data.BackupManager
 import app.flowsync.data.LogStore
 import app.flowsync.fs.Endpoints
+import app.flowsync.fs.GDriveEndpoint
 import app.flowsync.model.AppConfig
 import app.flowsync.model.Availability
 import app.flowsync.model.DotStatus
@@ -83,7 +84,7 @@ class MainViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    suspend fun driveEmail(token: String): String? = withContext(Dispatchers.IO) { app.flowsync.fs.GDriveEndpoint.fetchEmail(token) }
+    suspend fun driveEmail(token: String): String? = withContext(Dispatchers.IO) { GDriveEndpoint.fetchEmail(token) }
 
     // ---------- profiles ----------
 
