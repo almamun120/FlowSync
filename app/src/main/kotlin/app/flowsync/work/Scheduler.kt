@@ -52,6 +52,32 @@ object Scheduler {
         }
     }
 
+    fun runTaskNow(ctx: Context, taskId: String) {
+        val req = OneTimeWorkRequestBuilder<RcloneTaskWorker>()
+            .setInputData(workDataOf(RcloneTaskWorker.KEY_ID to taskId))
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.NOT_REQUIRED).build())
+            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            .build()
+        WorkManager.getInstance(ctx).enqueueUniqueWork("task_run_$taskId", ExistingWorkPolicy.KEEP, req)
+    }
+
+    fun applyTask(ctx: Context, t: app.flowsync.model.RcloneTask) {
+        val wm = WorkManager.getInstance(ctx)
+        val name = "task_periodic_${t.id}"
+        if (t.intervalMinutes > 0) {
+            val c = Constraints.Builder()
+                .setRequiredNetworkType(if (t.wifiOnly) NetworkType.UNMETERED else NetworkType.CONNECTED).build()
+            val req = PeriodicWorkRequestBuilder<RcloneTaskWorker>(maxOf(15, t.intervalMinutes).toLong(), TimeUnit.MINUTES)
+                .setInputData(workDataOf(RcloneTaskWorker.KEY_ID to t.id)).setConstraints(c).build()
+            wm.enqueueUniquePeriodicWork(name, ExistingPeriodicWorkPolicy.UPDATE, req)
+        } else wm.cancelUniqueWork(name)
+    }
+
+    fun cancelTask(ctx: Context, id: String) {
+        WorkManager.getInstance(ctx).cancelUniqueWork("task_periodic_$id")
+        SyncCenter.requestStop(id)
+    }
+
     fun cancel(ctx: Context, id: String) {
         WorkManager.getInstance(ctx).cancelUniqueWork(periodicName(id))
         SyncCenter.requestStop(id)

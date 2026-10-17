@@ -16,12 +16,17 @@ import app.flowsync.ui.MainActivity
 object Notifications {
     const val CHANNEL_SYNC = "sync_progress"
     const val CHANNEL_RESULT = "sync_result"
+    const val CHANNEL_SERVE = "serve"
 
     fun createChannels(ctx: Context) {
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL_SYNC, "Sync in progress", NotificationManager.IMPORTANCE_LOW)
                 .apply { description = "Shown while a profile is syncing in the background" }
+        )
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL_SERVE, "rclone servers", NotificationManager.IMPORTANCE_LOW)
+                .apply { description = "Shown while an rclone server (HTTP, WebDAV, FTP…) is running" }
         )
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL_RESULT, "Sync results", NotificationManager.IMPORTANCE_LOW)

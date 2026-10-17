@@ -4,10 +4,7 @@ package app.flowsync.ui
 
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import app.flowsync.fs.GDriveAuth
-import com.google.android.gms.auth.api.identity.Identity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -66,6 +63,7 @@ fun EditorScreen(vm: MainViewModel, id: String?, onClose: () -> Unit) {
         mutableStateOf(existing ?: SyncProfile(destination = EndpointConfig(protocol = Protocol.SMB)))
     }
     var error by remember { mutableStateOf<String?>(null) }
+    var showRclone by remember { mutableStateOf(false) }
 
     fun validate(): String? {
         if (p.name.isBlank()) return "Give the profile a name."
@@ -76,12 +74,18 @@ fun EditorScreen(vm: MainViewModel, id: String?, onClose: () -> Unit) {
                     if (c.host.isBlank()) return "$label: enter the host."
                     if (c.share.isBlank()) return "$label: enter the share name."
                 }
-                Protocol.GDRIVE -> if (c.username.isBlank()) return "$label: sign in with Google."
+                Protocol.RCLONE -> if (c.host.isBlank()) return "$label: choose an rclone remote."
                 else -> if (c.host.isBlank()) return "$label: enter the host."
             }
         }
+        if (p.mode == SyncMode.BISYNC && !p.bothRclone) return "Two-way (bisync) needs rclone remotes on both sides."
         if (p.filter.mode != FilterMode.ALL && p.filter.extensions.isEmpty()) return "Add at least one file extension, or choose “All files”."
         return null
+    }
+
+    if (showRclone) {
+        RcloneScreen(onClose = { showRclone = false })
+        return
     }
 
     Scaffold(
@@ -110,12 +114,12 @@ fun EditorScreen(vm: MainViewModel, id: String?, onClose: () -> Unit) {
                 }
             }
 
-            EndpointCard("Source (from)", p.source, vm, needWrite = p.mode == SyncMode.MOVE) { p = p.copy(source = it) }
-            EndpointCard("Destination (to)", p.destination, vm, needWrite = true) { p = p.copy(destination = it) }
+            EndpointCard("Source (from)", p.source, vm, needWrite = p.mode == SyncMode.MOVE, onManageRemotes = { showRclone = true }) { p = p.copy(source = it) }
+            EndpointCard("Destination (to)", p.destination, vm, needWrite = true, onManageRemotes = { showRclone = true }) { p = p.copy(destination = it) }
 
             Section("Sync mode") {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    SyncMode.values().forEach { m ->
+                    SyncMode.values().filter { it != SyncMode.BISYNC || p.bothRclone }.forEach { m ->
                         FilterChip(selected = p.mode == m, onClick = { p = p.copy(mode = m) }, label = { Text(m.label) })
                     }
                 }
@@ -123,6 +127,43 @@ fun EditorScreen(vm: MainViewModel, id: String?, onClose: () -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Include subfolders", Modifier.weight(1f))
                     Switch(p.includeSubfolders, { p = p.copy(includeSubfolders = it) })
+                }
+            }
+
+            if (p.bothRclone) {
+                Section("rclone engine") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Use rclone native sync")
+                            Text(
+                                "Server-side copy between clouds, checksums, parallel transfers. Required for Two-way.",
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(p.rclone.native || p.mode == SyncMode.BISYNC, { p = p.copy(rclone = p.rclone.copy(native = it)) },
+                            enabled = p.mode != SyncMode.BISYNC)
+                    }
+                    if (p.rclone.native || p.mode == SyncMode.BISYNC) {
+                        Field("Bandwidth limit (empty = none)", p.rclone.bwLimit,
+                            { p = p.copy(rclone = p.rclone.copy(bwLimit = it.trim())) }, placeholder = "2M   or   08:00,512k 23:00,off")
+                        Field("Parallel transfers", p.rclone.transfers.toString(),
+                            { p = p.copy(rclone = p.rclone.copy(transfers = it.filter { c -> c.isDigit() }.toIntOrNull() ?: 4)) }, number = true)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Compare by checksum (slower, safest)", Modifier.weight(1f))
+                            Switch(p.rclone.checksum, { p = p.copy(rclone = p.rclone.copy(checksum = it)) })
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Dry run (show what would happen, change nothing)", Modifier.weight(1f))
+                            Switch(p.rclone.dryRun, { p = p.copy(rclone = p.rclone.copy(dryRun = it)) })
+                        }
+                        Field("Extra rclone flags (optional)", p.rclone.extraFlags,
+                            { p = p.copy(rclone = p.rclone.copy(extraFlags = it)) },
+                            placeholder = "--fast-list --max-age 7d --track-renames", singleLine = false)
+                        Text(
+                            "Any rclone flag works here (backup-dir, max-age, drive-* options, filters …). When set, rclone runs as a command.",
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
@@ -230,6 +271,7 @@ private fun EndpointCard(
     cfg: EndpointConfig,
     vm: MainViewModel,
     needWrite: Boolean,
+    onManageRemotes: () -> Unit,
     onChange: (EndpointConfig) -> Unit
 ) {
     val ctx = LocalContext.current
@@ -255,30 +297,6 @@ private fun EndpointCard(
         }
     }
 
-    fun finishSignIn(token: String?) {
-        if (token == null) { result = "✗ No access token received"; return }
-        scope.launch {
-            val email = vm.driveEmail(token)
-            if (email == null) result = "✗ Could not read the Google account"
-            else { onChange(cfg.copy(username = email)); result = "Signed in ✓" }
-        }
-    }
-    val signInLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { r ->
-        try {
-            finishSignIn(Identity.getAuthorizationClient(ctx).getAuthorizationResultFromIntent(r.data).accessToken)
-        } catch (e: Exception) { result = "✗ " + (e.message ?: "Sign-in cancelled") }
-    }
-    fun startSignIn() {
-        result = null
-        Identity.getAuthorizationClient(ctx).authorize(GDriveAuth.request(cfg.driveFull, null))
-            .addOnSuccessListener { res ->
-                val pi = res.pendingIntent
-                if (res.hasResolution() && pi != null) signInLauncher.launch(IntentSenderRequest.Builder(pi.intentSender).build())
-                else finishSignIn(res.accessToken)
-            }
-            .addOnFailureListener { result = "✗ " + (it.message ?: "Sign-in failed") }
-    }
-
     Section(title) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Protocol.values().forEach { pr ->
@@ -302,25 +320,7 @@ private fun EndpointCard(
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Protocol.GDRIVE -> {
-                Text(
-                    if (cfg.username.isBlank()) "Not signed in" else "Signed in as ${cfg.username}",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                FilledTonalButton(onClick = { startSignIn() }) {
-                    Text(if (cfg.username.isBlank()) "Sign in with Google" else "Sign in again")
-                }
-                Field("Folder in Drive", cfg.path, { onChange(cfg.copy(path = it)) }, placeholder = "FlowSync/Phone")
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Full Drive access (see files not created by this app)", Modifier.weight(1f))
-                    Switch(cfg.driveFull, { onChange(cfg.copy(driveFull = it, username = "")) })
-                }
-                Text(
-                    "Default access only sees files and folders this app created – ideal for backups. " +
-                        "Google Docs/Sheets files are skipped. Deleted files go to the Drive trash.",
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
+            Protocol.RCLONE -> RcloneEndpointFields(cfg, onChange, onManageRemotes)
             else -> {
                 Text(
                     when (cfg.protocol) {

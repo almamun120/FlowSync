@@ -10,5 +10,10 @@ class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val app = context.applicationContext as? FlowSyncApp ?: return
         Scheduler.applyAll(context, app.repo.profiles.value)
+        app.rcloneStore.tasks.value.forEach { Scheduler.applyTask(context, it) }
+        // Servers marked "start automatically"
+        app.rcloneStore.serves.value.filter { it.autoStart }.forEach {
+            try { app.flowsync.rclone.ServeCenter.start(context, it.id) } catch (_: Exception) {}
+        }
     }
 }

@@ -13,8 +13,10 @@ android {
         applicationId = "app.flowsync"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 3
+        versionName = "1.2.0"
+        // rclone is shipped as a native executable (jniLibs/<abi>/librclone.so), built by scripts/build-rclone.sh
+        ndk { abiFilters += listOf("arm64-v8a") }
     }
 
     // Permanent signing key: supplied through environment variables (GitHub Secrets in CI).
@@ -49,6 +51,10 @@ android {
     buildFeatures { compose = true }
 
     packaging {
+        jniLibs {
+            useLegacyPackaging = true          // extract librclone.so so it can be executed
+            keepDebugSymbols += "**/librclone.so"
+        }
         resources {
             excludes += setOf(
                 "META-INF/{AL2.0,LGPL2.1}",
@@ -86,6 +92,5 @@ dependencies {
     implementation("com.hierynomus:smbj:0.13.0")          // SMB 2/3
     implementation("commons-net:commons-net:3.11.1")      // FTP / FTPS
     implementation("com.github.mwiede:jsch:0.2.21")       // SFTP
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")  // WebDAV + Google Drive REST
-    implementation("com.google.android.gms:play-services-auth:21.2.0") // Google Drive authorization
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")  // WebDAV + rclone remote control
 }

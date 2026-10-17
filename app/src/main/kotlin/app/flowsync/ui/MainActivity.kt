@@ -29,6 +29,7 @@ sealed interface Screen {
     data object Home : Screen
     data class Editor(val id: String?) : Screen
     data object Settings : Screen
+    data object Rclone : Screen
     data class Logs(val id: String) : Screen
 }
 
@@ -74,7 +75,8 @@ private fun AppRoot(vm: MainViewModel) {
             onLogs = { screen = Screen.Logs(it) }
         )
         is Screen.Editor -> EditorScreen(vm, s.id) { screen = Screen.Home }
-        Screen.Settings -> SettingsScreen(vm, resumeTick) { screen = Screen.Home }
+        Screen.Settings -> SettingsScreen(vm, resumeTick, onRclone = { screen = Screen.Rclone }) { screen = Screen.Home }
+        Screen.Rclone -> RcloneScreen { screen = Screen.Settings }
         is Screen.Logs -> LogScreen(vm, s.id) { screen = Screen.Home }
     }
 }

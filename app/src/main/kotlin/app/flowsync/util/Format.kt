@@ -36,7 +36,7 @@ object Format {
             Protocol.FTP -> "${if (c.secure) "FTPS" else "FTP"}  ${c.host}$tail"
             Protocol.SFTP -> "SFTP  ${c.host}$tail"
             Protocol.WEBDAV -> "WebDAV  ${c.host}$tail"
-            Protocol.GDRIVE -> "Google Drive  ${c.username.ifBlank { "(not signed in)" }}$tail"
+            Protocol.RCLONE -> "rclone  ${c.host}:$p"
         }
     }
 }

@@ -8,7 +8,6 @@ import app.flowsync.FlowSyncApp
 import app.flowsync.data.BackupManager
 import app.flowsync.data.LogStore
 import app.flowsync.fs.Endpoints
-import app.flowsync.fs.GDriveEndpoint
 import app.flowsync.model.AppConfig
 import app.flowsync.model.Availability
 import app.flowsync.model.DotStatus
@@ -84,8 +83,6 @@ class MainViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    suspend fun driveEmail(token: String): String? = withContext(Dispatchers.IO) { GDriveEndpoint.fetchEmail(token) }
-
     // ---------- profiles ----------
 
     fun save(p: SyncProfile) {
@@ -130,7 +127,8 @@ class MainViewModel(private val app: Application) : AndroidViewModel(app) {
 
     suspend fun exportTo(uri: Uri, includeSecrets: Boolean): String = withContext(Dispatchers.IO) {
         try {
-            val text = BackupManager.export(repo.profiles.value, includeSecrets)
+            val store = (app as FlowSyncApp).rcloneStore
+            val text = BackupManager.export(repo.profiles.value, includeSecrets, store.serves.value, store.tasks.value)
             (app.contentResolver.openOutputStream(uri, "wt") ?: error("Cannot open file")).use { it.write(text.toByteArray()) }
             "Saved ${repo.profiles.value.size} profile(s)"
         } catch (e: Exception) { "Export failed: ${e.message}" }
@@ -146,7 +144,10 @@ class MainViewModel(private val app: Application) : AndroidViewModel(app) {
     fun applyImport(cfg: AppConfig, replace: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
             val old = repo.profiles.value
-            if (replace) { old.forEach { Scheduler.cancel(app, it.id) }; repo.replaceAll(cfg.profiles) } else repo.merge(cfg.profiles)
+            val store = (app as FlowSyncApp).rcloneStore
+            if (replace) { old.forEach { Scheduler.cancel(app, it.id) }; repo.replaceAll(cfg.profiles); store.replaceAll(cfg.serves, cfg.tasks) }
+            else { repo.merge(cfg.profiles); store.merge(cfg.serves, cfg.tasks) }
+            store.tasks.value.forEach { Scheduler.applyTask(app, it) }
             Scheduler.applyAll(app, repo.profiles.value)
             refresh()
         }

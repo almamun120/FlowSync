@@ -54,7 +54,7 @@ import java.util.Date
 import java.util.Locale
 
 @Composable
-fun SettingsScreen(vm: MainViewModel, resumeTick: Int, onClose: () -> Unit) {
+fun SettingsScreen(vm: MainViewModel, resumeTick: Int, onRclone: () -> Unit, onClose: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var includeSecrets by remember { mutableStateOf(true) }
@@ -109,6 +109,15 @@ fun SettingsScreen(vm: MainViewModel, resumeTick: Int, onClose: () -> Unit) {
                 )
             }
 
+            Section("Cloud storage (rclone)") {
+                Text(
+                    "Google Drive, Dropbox, OneDrive, S3, Backblaze, Mega and 50+ more through the built-in rclone. " +
+                        "Add remotes, import your rclone.conf, or use the rclone terminal.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Button(onClick = onRclone, modifier = Modifier.fillMaxWidth()) { Text("Manage rclone remotes") }
+            }
+
             Section("Config backup (JSON)") {
                 Text(
                     "All profiles are stored as JSON. Export a copy to restore later or move to another phone.",
@@ -133,7 +142,7 @@ fun SettingsScreen(vm: MainViewModel, resumeTick: Int, onClose: () -> Unit) {
             }
 
             Section("About") {
-                Text("FlowSync 1.0 – modern rewrite of the SMBSync2 idea in Kotlin + Jetpack Compose.\nProtocols: Local (SAF), SMB 2/3, FTP/FTPS, SFTP, WebDAV. No root required.",
+                Text("FlowSync 1.0 – modern rewrite of the SMBSync2 idea in Kotlin + Jetpack Compose.\nProtocols: Local (SAF), SMB 2/3, FTP/FTPS, SFTP, WebDAV and everything rclone supports (Google Drive …). No root required.",
                     style = MaterialTheme.typography.bodySmall)
             }
         }

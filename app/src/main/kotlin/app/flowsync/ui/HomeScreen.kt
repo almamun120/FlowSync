@@ -218,6 +218,7 @@ private fun ProfileCard(
 
             FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Tag(p.mode.label)
+                if (p.useNativeRclone) Tag("rclone native")
                 when (p.filter.mode) {
                     FilterMode.ALL -> {}
                     FilterMode.ONLY -> Tag("only " + p.filter.extensions.take(4).joinToString(",") + if (p.filter.extensions.size > 4) "…" else "")

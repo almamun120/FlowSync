@@ -35,6 +35,19 @@ object AppPermissions {
         }
     }
 
+    fun allFilesGranted(): Boolean =
+        Build.VERSION.SDK_INT < 30 || android.os.Environment.isExternalStorageManager()
+
+    fun requestAllFiles(ctx: Context) {
+        try {
+            if (Build.VERSION.SDK_INT >= 30)
+                start(ctx, Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:${ctx.packageName}")))
+            else openAppSettings(ctx)
+        } catch (e: Exception) {
+            try { start(ctx, Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) } catch (_: Exception) { openAppSettings(ctx) }
+        }
+    }
+
     fun openAppSettings(ctx: Context) {
         start(ctx, Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}")))
     }

@@ -1,6 +1,8 @@
 package app.flowsync.data
 
 import app.flowsync.model.AppConfig
+import app.flowsync.model.RcloneTask
+import app.flowsync.model.ServeConfig
 import app.flowsync.model.SyncProfile
 import kotlinx.serialization.json.Json
 
@@ -12,9 +14,13 @@ object BackupManager {
         encodeDefaults = true
     }
 
-    fun export(profiles: List<SyncProfile>, includeSecrets: Boolean): String {
+    fun export(
+        profiles: List<SyncProfile>, includeSecrets: Boolean,
+        serves: List<ServeConfig> = emptyList(), tasks: List<RcloneTask> = emptyList()
+    ): String {
         val list = if (includeSecrets) profiles else profiles.map { it.withoutSecrets() }
-        return json.encodeToString(AppConfig.serializer(), AppConfig(exportedAt = System.currentTimeMillis(), profiles = list))
+        val sv = if (includeSecrets) serves else serves.map { it.copy(pass = "") }
+        return json.encodeToString(AppConfig.serializer(), AppConfig(exportedAt = System.currentTimeMillis(), profiles = list, serves = sv, tasks = tasks))
     }
 
     fun parse(text: String): AppConfig {

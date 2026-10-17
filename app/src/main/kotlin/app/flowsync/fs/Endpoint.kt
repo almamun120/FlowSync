@@ -61,6 +61,6 @@ object Endpoints {
         Protocol.FTP -> FtpEndpoint(cfg)
         Protocol.SFTP -> SftpEndpoint(cfg)
         Protocol.WEBDAV -> WebDavEndpoint(cfg)
-        Protocol.GDRIVE -> GDriveEndpoint(ctx.applicationContext, cfg)
+        Protocol.RCLONE -> RcloneEndpoint(ctx.applicationContext, cfg)
     }
 }

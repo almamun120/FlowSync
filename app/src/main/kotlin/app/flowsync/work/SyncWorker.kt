@@ -85,6 +85,27 @@ class SyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, 
         var src: app.flowsync.fs.Endpoint? = null
         var dst: app.flowsync.fs.Endpoint? = null
         val cancelled = { !job.isActive || SyncCenter.isStopRequested(id) }
+        if (profile.useNativeRclone) {
+            return try {
+                val r = app.flowsync.rclone.RcloneNativeSync.run(profile, cancelled, log = { LogStore.append(id, it) },
+                    progress = { msg, bytes, files ->
+                        val now = SystemClock.elapsedRealtime()
+                        if (now - lastUi > 700) {
+                            lastUi = now
+                            SyncCenter.update(id, RunState(msg, files, 0, bytes))
+                            Notifications.update(ctx, id, profile.name, "$msg  ·  $files files, ${Format.bytes(bytes)}")
+                        }
+                    })
+                Outcome(r.summary, notify = r.transfers > 0 || r.errors > 0, error = r.errors > 0)
+            } catch (e: SyncCancelledException) {
+                LogStore.append(id, "=== Stopped ===")
+                Outcome("Stopped", notify = false, error = false)
+            } catch (e: Exception) {
+                val msg = e.message ?: e.javaClass.simpleName
+                LogStore.append(id, "=== Failed: $msg ===")
+                Outcome("Failed: $msg", notify = true, error = true)
+            }
+        }
         return try {
             src = Endpoints.create(ctx, profile.source, profile.mode == SyncMode.MOVE)
             dst = Endpoints.create(ctx, profile.destination, true)

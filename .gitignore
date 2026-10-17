@@ -6,3 +6,6 @@ build/
 /captures
 .externalNativeBuild
 .cxx
+
+# rclone binaries are built by scripts/build-rclone.sh (CI)
+app/src/main/jniLibs/
