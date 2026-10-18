@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import app.flowsync.FlowSyncApp
+import app.flowsync.rclone.ServeCenter
 
 /** Re-arms all schedules after reboot / app update (WorkManager also persists them, this is belt and braces). */
 class BootReceiver : BroadcastReceiver() {
@@ -13,7 +14,7 @@ class BootReceiver : BroadcastReceiver() {
         app.rcloneStore.tasks.value.forEach { Scheduler.applyTask(context, it) }
         // Servers marked "start automatically"
         app.rcloneStore.serves.value.filter { it.autoStart }.forEach {
-            try { app.flowsync.rclone.ServeCenter.start(context, it.id) } catch (_: Exception) {}
+            try { ServeCenter.start(context, it.id) } catch (_: Exception) {}
         }
     }
 }
