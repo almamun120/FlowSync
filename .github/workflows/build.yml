@@ -26,6 +26,8 @@ jobs:
         run: |
           f=$(find . -name settings.gradle.kts -not -path './.git/*' | head -1)
           echo "dir=$(dirname "$f")" >> "$GITHUB_OUTPUT"
+          # Remove leftovers of the old native Google Drive code (replaced by rclone)
+          find . -name 'GDriveEndpoint.kt' -not -path './.git/*' -print -delete
 
       - uses: actions/setup-java@v4
         with:
